@@ -10,5 +10,5 @@
 .vscode/
 
 /Local
-/FlowPluginsTs/LocalFlowPlugins
+# /FlowPluginsTs/LocalFlowPlugins
 /FlowPlugins/LocalFlowPlugins
