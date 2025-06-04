@@ -21,12 +21,16 @@ export async function waitForJobCompletion(jobId: number, args: IpluginInputArgs
 
     try {
       const res = await args.deps.axios(requestConfig);
+      if (res.status !== 200) {
+        throw new Error(`Request failed with status code ${res.status}`);
+      }
       const jobStatus = res.data.data.findJob.status;
       args.jobLog(`Job status: ${jobStatus}`);
-      
-      if (jobStatus === 'COMPLETED' || jobStatus === 'FAILED') {
+
+      if (['FINISHED', 'CANCELED', 'COMPLETED', 'FAILED'].includes(jobStatus)) {
         return;
       }
+
       await wait(500); // Wait for 5 seconds before checking the job status again
     } catch (err) {
       args.jobLog('Job status request failed');

@@ -66,9 +66,8 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   args.inputs = lib.loadDefaultValues(args.inputs, details);
 
   const { requestUrl, apiKey, allFiles } = args.inputs;
-  const fileDir = getFileAbosluteDir(args.inputFileObj._id).toLowerCase();
-
-  args.jobLog(`File Directory: ${fileDir}`);
+  const fileDir = getFileAbosluteDir(args.inputFileObj._id);
+  let sceneIDs: string[] = [];
 
   const requestConfig = {
     method: 'post',
@@ -78,14 +77,59 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
       ApiKey: apiKey,
     },
     // eslint-disable-next-line max-len
-    data: JSON.stringify({ query: `mutation { metadataGenerate(input: {paths: [${allFiles ? "" : JSON.stringify(fileDir)}]}) }` }),
+    data: JSON.stringify({
+      query: `{
+        findScenesByPathRegex(
+          filter: {q: "${fileDir}"}
+        ) {
+          count
+          scenes {
+            id
+          }
+        }
+      }`
+    }),
   };
+
+  try {
+    const res = await args.deps.axios(requestConfig);
+    args.jobLog(`Sending web request to: ${JSON.stringify(requestConfig)}`);
+
+    if (res.status !== 200) {
+      throw new Error(`Request failed with status code ${res.status}`);
+    }
+
+    args.jobLog(`Response: ${JSON.stringify(res.data)}`);
+    const { count, scenes } = res.data.data.findScenesByPathRegex;
+
+    args.jobLog(`Found ${count} scenes: ${scenes}`);
+    if (count > 0) {
+      sceneIDs = scenes.map((scene: { id: string }) => scene.id);
+    }
+
+  } catch (err) {
+    args.jobLog('Web Request Failed');
+    args.jobLog(JSON.stringify(err));
+    throw new Error('Web Request Failed');
+  }
+
+  let query: string;
+  if (allFiles) {
+    query = 'mutation { metadataGenerate(input: {covers: true, markers: true, clipPreviews: true, phashes: true, sprites: true, markerScreenshots: true}) }';
+  } else {
+    query = `mutation { metadataGenerate(input: {sceneIDs: ${JSON.stringify(sceneIDs)}, covers: true, markers: true, clipPreviews: true, phashes: true, sprites: true, markerScreenshots: true}) }`;
+  }
+  requestConfig.data = JSON.stringify({ query });
 
   let jobId: number;
   try {
     const res = await args.deps.axios(requestConfig);
+    if (res.status !== 200) {
+      throw new Error(`Request failed with status code ${res.status}`);
+    }
+    args.jobLog(`Sending web request to: ${JSON.stringify(requestConfig)}`);
+
     jobId = res.data.data.metadataGenerate;
-    args.jobLog("Sending web request to: ".concat(JSON.stringify(requestConfig)));
   } catch (err) {
     args.jobLog('Web Request Failed');
     args.jobLog(JSON.stringify(err));

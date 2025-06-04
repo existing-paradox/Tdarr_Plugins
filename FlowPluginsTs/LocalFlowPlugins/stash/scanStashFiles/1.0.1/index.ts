@@ -68,7 +68,7 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   args.inputs = lib.loadDefaultValues(args.inputs, details);
 
   const { requestUrl, apiKey, allFiles } = args.inputs;
-  const fileDir = getFileAbosluteDir(args.inputFileObj._id).toLowerCase();
+  const fileDir = getFileAbosluteDir(args.inputFileObj._id);
 
   args.jobLog(`File Directory: ${fileDir}`);
 
@@ -86,6 +86,9 @@ const plugin = async (args: IpluginInputArgs): Promise<IpluginOutputArgs> => {
   let jobId: number;
   try {
     const res = await args.deps.axios(requestConfig);
+    if (res.status !== 200) {
+      throw new Error(`Request failed with status code ${res.status}`);
+    }
     jobId = res.data.data.metadataScan;
     args.jobLog("Sending web request to: ".concat(JSON.stringify(requestConfig)));
   } catch (err) {
